@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>毒品防治策略：雙城市視覺模擬</title>
+<style>
+  :root{
+    --bg:#111418; --panel:#1a1f26; --line:#39424e; --text:#eef2f7;
+    --muted:#aeb8c4; --white:#f7f7f7; --red:#ff5c67; --blue:#70a7ff;
+    --green:#6ed69b; --yellow:#ffd166;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif}
+  .wrap{max-width:1320px;margin:auto;padding:22px}
+  h1{font-size:28px;margin:0 0 6px}
+  .lead{color:var(--muted);margin:0 0 18px;line-height:1.55}
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+  button{border:0;border-radius:9px;padding:9px 14px;font-weight:700;cursor:pointer}
+  .primary{background:#e8edf4;color:#111}.secondary{background:#313946;color:#fff}
+  label{font-size:13px;color:var(--muted)}
+  input[type=range]{width:150px;vertical-align:middle}
+  .cities{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .city{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .city h2{font-size:18px;margin:0;padding:12px 14px 2px}
+  .city .sub{font-size:13px;color:var(--muted);padding:0 14px 10px;min-height:48px}
+  canvas{display:block;width:100%;height:auto;background:#0b0e12}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:10px}
+  .stat{background:#11161c;border-radius:8px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px}.stat span{font-size:11px;color:var(--muted)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0;color:var(--muted);font-size:13px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+  .box{width:12px;height:12px;display:inline-block;margin-right:5px;border-radius:2px}
+  .note{background:#151a20;border-left:4px solid #657487;border-radius:8px;
+    padding:12px 14px;color:#cbd3dc;line-height:1.55;font-size:13px}
+  .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+  .control-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .control-card h3{font-size:15px;margin:0 0 10px}
+  .slider-row{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;margin:10px 0}
+  .slider-row input{grid-column:1 / span 2;width:100%}
+  .slider-row span{font-variant-numeric:tabular-nums;color:var(--text);font-size:12px}
+  .small{font-size:12px;color:var(--muted);line-height:1.45}
+  @media(max-width:900px){
+    .cities,.controls{grid-template-columns:1fr}
+    .stats{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>兩種毒品防治策略的視覺模擬</h1>
+  <p class="lead">
+    兩座城市從相同條件出發。白點代表未感染的毒品使用者，紅點代表感染者。
+    左側模擬警察／拘禁，右側模擬防治中心／減害。下方所有參數均為教學用示意值，可由使用者自行調整。
+  </p>
+
+  <div class="toolbar">
+    <button class="primary" id="toggle">暫停</button>
+    <button class="secondary" id="reset">重新開始</button>
+    <label>模擬速度
+      <input id="speed" type="range" min="0.3" max="3" step="0.1" value="1">
+      <span id="speedv">1.0×</span>
+    </label>
+    <label>顯示作用範圍 <input id="showRadius" type="checkbox"></label>
+  </div>
+
+  <div class="cities">
+    <section class="city">
+      <h2>城市 A：警察／拘禁策略</h2>
+      <div class="sub">警察隨機巡邏；接觸後個體暫時離開街面，期滿後可能回到系統。</div>
+      <canvas id="left" width="600" height="420"></canvas>
+      <div class="stats">
+        <div class="stat"><b id="lActive">0</b><span>街面使用者</span></div>
+        <div class="stat"><b id="lInf">0</b><span>目前感染</span></div>
+        <div class="stat"><b id="lHeld">0</b><span>暫時拘禁</span></div>
+        <div class="stat"><b id="lCum">0</b><span>累積新感染</span></div>
+      </div>
+    </section>
+
+    <section class="city">
+      <h2>城市 B：防治中心／減害策略</h2>
+      <div class="sub">靠近中心者可能進入服務；接受服務期間感染與傳播風險下降，並可能停止高風險使用。</div>
+      <canvas id="right" width="600" height="420"></canvas>
+      <div class="stats">
+        <div class="stat"><b id="rActive">0</b><span>街面使用者</span></div>
+        <div class="stat"><b id="rInf">0</b><span>目前感染</span></div>
+        <div class="stat"><b id="rCare">0</b><span>接受服務</span></div>
+        <div class="stat"><b id="rCum">0</b><span>累積新感染</span></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#f7f7f7"></i>未感染使用者</span>
+    <span><i class="dot" style="background:#ff5c67"></i>感染者</span>
+    <span><i class="dot" style="background:#70a7ff"></i>警察</span>
+    <span><i class="box" style="background:#6ed69b"></i>防治中心</span>
+    <span><i class="dot" style="background:#ffd166"></i>正在接受服務</span>
+  </div>
+
+  <div class="controls">
+    <div class="control-card">
+      <h3>共同環境參數</h3>
+      <div class="slider-row"><label for="initial">初始毒品使用者</label><span id="initialVal"></span><input id="initial" type="range" min="20" max="120" step="5" value="55"></div>
+      <div class="slider-row"><label for="initialInf">初始感染者</label><span id="initialInfVal"></span><input id="initialInf" type="range" min="0" max="30" step="1" value="8"></div>
+      <div class="slider-row"><label for="spawnRate">新使用者生成速度</label><span id="spawnRateVal"></span><input id="spawnRate" type="range" min="0" max="0.08" step="0.005" value="0.018"></div>
+      <div class="slider-row"><label for="transmission">接近時傳染機率</label><span id="transmissionVal"></span><input id="transmission" type="range" min="0" max="0.04" step="0.002" value="0.01"></div>
+      <div class="small">修改「初始」參數後按「重新開始」才會套用；其餘參數可即時改變。</div>
+    </div>
+
+    <div class="control-card">
+      <h3>警察／拘禁策略</h3>
+      <div class="slider-row"><label for="policeCount">警察數量</label><span id="policeCountVal"></span><input id="policeCount" type="range" min="0" max="8" step="1" value="1"></div>
+      <div class="slider-row"><label for="captureDist">逮捕接觸距離</label><span id="captureDistVal"></span><input id="captureDist" type="range" min="6" max="30" step="1" value="13"></div>
+      <div class="slider-row"><label for="detention">平均拘禁時間</label><span id="detentionVal"></span><input id="detention" type="range" min="80" max="900" step="20" value="390"></div>
+      <div class="slider-row"><label for="permanentExit">拘禁後永久停止使用機率</label><span id="permanentExitVal"></span><input id="permanentExit" type="range" min="0" max="1" step="0.05" value="0.10"></div>
+    </div>
+
+    <div class="control-card">
+      <h3>防治中心／減害策略</h3>
+      <div class="slider-row"><label for="centerCount">防治中心數量</label><span id="centerCountVal"></span><input id="centerCount" type="range" min="0" max="5" step="1" value="1"></div>
+      <div class="slider-row"><label for="centerRadius">中心影響半徑</label><span id="centerRadiusVal"></span><input id="centerRadius" type="range" min="30" max="140" step="5" value="82"></div>
+      <div class="slider-row"><label for="enterCare">進入服務機率</label><span id="enterCareVal"></span><input id="enterCare" type="range" min="0" max="0.08" step="0.002" value="0.018"></div>
+      <div class="slider-row"><label for="riskReduction">接受服務後風險降低</label><span id="riskReductionVal"></span><input id="riskReduction" type="range" min="0" max="1" step="0.05" value="0.88"></div>
+      <div class="slider-row"><label for="careRecovery">服務後停止高風險使用速度</label><span id="careRecoveryVal"></span><input id="careRecovery" type="range" min="0" max="0.002" step="0.0001" value="0.0003"></div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:14px">
+    教學提醒：這是一個概念性的 agent-based model，不是任何真實政策的效果估計。
+    最適合的展示方式是讓觀眾自行改變策略強度，再比較「目前感染者」與「累積新感染」如何演變。
+  </div>
+</div>
+
+<script>
+const W=600,H=420;
+const cfg={
+  initial:55, initialInf:8, spawnRate:0.018, spontaneousInf:0.000055,
+  contactDist:13, transmission:0.010, maxSpeed:0.72,
+  policeCount:1, policeCaptureDist:13, detentionMean:390,
+  permanentExitAfterDetention:0.10,
+  centerCount:1, centerRadius:82, enterCareProb:0.018,
+  riskReduction:0.88, careRecovery:0.0003
+};
+
+let running=true,timeScale=1,showRadius=false;
+
+function rnd(a,b){return a+Math.random()*(b-a)}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function makePerson(forceInf=false){
+  return {x:rnd(15,W-15),y:rnd(15,H-15),vx:rnd(-cfg.maxSpeed,cfg.maxSpeed),
+    vy:rnd(-cfg.maxSpeed,cfg.maxSpeed),infected:forceInf,state:"active",timer:0,inCare:false};
+}
+function initPeople(){
+  const arr=[];
+  const inf=Math.min(cfg.initialInf,cfg.initial);
+  for(let i=0;i<cfg.initial;i++) arr.push(makePerson(i<inf));
+  return arr;
+}
+function makePolice(){
+  return {x:rnd(30,W-30),y:rnd(30,H-30),vx:rnd(-.7,.7),vy:rnd(-.7,.7)};
+}
+function makeCenters(n){
+  const anchors=[
+    [0.78,0.50],[0.25,0.28],[0.28,0.75],[0.70,0.22],[0.72,0.78]
+  ];
+  return anchors.slice(0,n).map(([x,y])=>({x:W*x,y:H*y,r:cfg.centerRadius}));
+}
+function makeCity(kind){
+  return {kind,people:initPeople(),cumulative:0,
+    police:Array.from({length:cfg.policeCount},makePolice),
+    centers:makeCenters(cfg.centerCount)};
+}
+let left=makeCity("police"),right=makeCity("center");
+
+function syncAgents(){
+  while(left.police.length<cfg.policeCount) left.police.push(makePolice());
+  if(left.police.length>cfg.policeCount) left.police.length=cfg.policeCount;
+  right.centers=makeCenters(cfg.centerCount);
+}
+
+function move(o,factor=1){
+  if(Math.random()<0.018){o.vx+=rnd(-.18,.18);o.vy+=rnd(-.18,.18)}
+  const s=Math.hypot(o.vx,o.vy)||1;
+  if(s>cfg.maxSpeed){o.vx=o.vx/s*cfg.maxSpeed;o.vy=o.vy/s*cfg.maxSpeed}
+  o.x+=o.vx*timeScale*factor;o.y+=o.vy*timeScale*factor;
+  if(o.x<6||o.x>W-6){o.vx*=-1;o.x=Math.max(6,Math.min(W-6,o.x))}
+  if(o.y<6||o.y>H-6){o.vy*=-1;o.y=Math.max(6,Math.min(H-6,o.y))}
+}
+
+function disease(city){
+  const active=city.people.filter(p=>p.state==="active");
+  const mult=p=>p.inCare?(1-cfg.riskReduction):1;
+  for(const p of active){
+    if(!p.infected && Math.random()<cfg.spontaneousInf*timeScale*mult(p)){
+      p.infected=true;city.cumulative++;
+    }
+  }
+  for(let i=0;i<active.length;i++){
+    const a=active[i]; if(!a.infected) continue;
+    for(let j=0;j<active.length;j++){
+      if(i===j) continue;
+      const b=active[j]; if(b.infected) continue;
+      if(Math.abs(a.x-b.x)>cfg.contactDist||Math.abs(a.y-b.y)>cfg.contactDist) continue;
+      if(dist(a,b)<=cfg.contactDist){
+        const prob=cfg.transmission*timeScale*mult(a)*mult(b);
+        if(Math.random()<prob){b.infected=true;city.cumulative++}
+      }
+    }
+  }
+}
+
+function updatePolice(city){
+  for(const cop of city.police) move(cop,1.15);
+  for(const p of city.people){
+    if(p.state==="detained"){
+      p.timer-=timeScale;
+      if(p.timer<=0){
+        if(Math.random()<cfg.permanentExitAfterDetention) p.state="removed";
+        else{p.state="active";p.x=rnd(15,W-15);p.y=rnd(15,H-15)}
+      }
+      continue;
+    }
+    if(p.state!=="active") continue;
+    move(p);
+    for(const cop of city.police){
+      if(dist(p,cop)<cfg.policeCaptureDist){
+        p.state="detained";
+        const spread=cfg.detentionMean*0.33;
+        p.timer=Math.max(20,rnd(cfg.detentionMean-spread,cfg.detentionMean+spread));
+        break;
+      }
+    }
+  }
+}
+
+function nearestCenter(p,centers){
+  let best=null,bestD=Infinity;
+  for(const c of centers){const d=dist(p,c);if(d<bestD){bestD=d;best=c}}
+  return {c:best,d:bestD};
+}
+
+function updateCenter(city){
+  for(const p of city.people){
+    if(p.state!=="active") continue;
+    if(!p.inCare) move(p);
+    else{
+      const nc=nearestCenter(p,city.centers);
+      if(nc.c){
+        p.x+=(nc.c.x-p.x)*0.018*timeScale;
+        p.y+=(nc.c.y-p.y)*0.018*timeScale;
+      }
+      if(Math.random()<cfg.careRecovery*timeScale) p.state="removed";
+    }
+    if(!p.inCare&&city.centers.length){
+      const nc=nearestCenter(p,city.centers);
+      if(nc.c&&nc.d<nc.c.r&&Math.random()<cfg.enterCareProb*timeScale) p.inCare=true;
+    }
+  }
+}
+
+function maybeSpawn(city){
+  if(Math.random()<cfg.spawnRate/60*timeScale) city.people.push(makePerson(false));
+}
+
+function drawCity(canvas,city){
+  const c=canvas.getContext("2d");c.clearRect(0,0,W,H);
+  c.fillStyle="#0b0e12";c.fillRect(0,0,W,H);
+  c.strokeStyle="rgba(255,255,255,.035)";
+  for(let x=0;x<W;x+=30){c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke()}
+  for(let y=0;y<H;y+=30){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+
+  if(city.kind==="center"){
+    city.centers.forEach((cc,idx)=>{
+      cc.r=cfg.centerRadius;
+      if(showRadius){
+        c.beginPath();c.arc(cc.x,cc.y,cc.r,0,Math.PI*2);
+        c.fillStyle="rgba(110,214,155,.06)";c.fill();
+        c.strokeStyle="rgba(110,214,155,.35)";c.stroke();
+      }
+      c.fillStyle="#6ed69b";c.fillRect(cc.x-22,cc.y-18,44,36);
+      c.fillStyle="#0b0e12";c.font="bold 11px sans-serif";c.textAlign="center";
+      c.fillText("中心"+(city.centers.length>1?idx+1:""),cc.x,cc.y+4);
+    });
+  }else{
+    city.police.forEach(cop=>{
+      if(showRadius){
+        c.beginPath();c.arc(cop.x,cop.y,cfg.policeCaptureDist,0,Math.PI*2);
+        c.strokeStyle="rgba(112,167,255,.45)";c.stroke();
+      }
+      c.beginPath();c.arc(cop.x,cop.y,7,0,Math.PI*2);c.fillStyle="#70a7ff";c.fill();
+      c.fillStyle="#cfe0ff";c.font="11px sans-serif";c.textAlign="center";c.fillText("警",cop.x,cop.y-11);
+    });
+  }
+
+  for(const p of city.people){
+    if(p.state!=="active") continue;
+    c.beginPath();c.arc(p.x,p.y,p.inCare?5:4,0,Math.PI*2);
+    c.fillStyle=p.inCare?"#ffd166":(p.infected?"#ff5c67":"#f7f7f7");c.fill();
+    if(p.inCare&&p.infected){c.strokeStyle="#ff5c67";c.lineWidth=2;c.stroke()}
+  }
+}
+
+function stats(city,prefix){
+  const active=city.people.filter(p=>p.state==="active");
+  document.getElementById(prefix+"Active").textContent=active.filter(p=>!p.inCare).length;
+  document.getElementById(prefix+"Inf").textContent=active.filter(p=>p.infected).length;
+  if(city.kind==="police") document.getElementById(prefix+"Held").textContent=city.people.filter(p=>p.state==="detained").length;
+  else document.getElementById(prefix+"Care").textContent=active.filter(p=>p.inCare).length;
+  document.getElementById(prefix+"Cum").textContent=city.cumulative;
+}
+
+function resetSimulation(){left=makeCity("police");right=makeCity("center")}
+
+function bindRange(id, key, formatter, immediate=true){
+  const el=document.getElementById(id), out=document.getElementById(id+"Val");
+  const apply=()=>{
+    const v=+el.value; out.textContent=formatter(v);
+    cfg[key]=v;
+    if(immediate) syncAgents();
+  };
+  el.addEventListener("input",apply); apply();
+}
+
+bindRange("initial","initial",v=>v+" 人",false);
+bindRange("initialInf","initialInf",v=>v+" 人",false);
+bindRange("spawnRate","spawnRate",v=>v.toFixed(3));
+bindRange("transmission","transmission",v=>(v*100).toFixed(1)+"%");
+bindRange("policeCount","policeCount",v=>v+" 名");
+bindRange("captureDist","policeCaptureDist",v=>v+" px");
+bindRange("detention","detentionMean",v=>v+" 單位");
+bindRange("permanentExit","permanentExitAfterDetention",v=>Math.round(v*100)+"%");
+bindRange("centerCount","centerCount",v=>v+" 所");
+bindRange("centerRadius","centerRadius",v=>v+" px");
+bindRange("enterCare","enterCareProb",v=>(v*100).toFixed(1)+"%");
+bindRange("riskReduction","riskReduction",v=>Math.round(v*100)+"%");
+bindRange("careRecovery","careRecovery",v=>v.toFixed(4));
+
+document.getElementById("toggle").addEventListener("click",()=>{
+  running=!running;document.getElementById("toggle").textContent=running?"暫停":"繼續";
+});
+document.getElementById("reset").addEventListener("click",resetSimulation);
+document.getElementById("speed").addEventListener("input",e=>{
+  timeScale=+e.target.value;document.getElementById("speedv").textContent=timeScale.toFixed(1)+"×";
+});
+document.getElementById("showRadius").addEventListener("change",e=>showRadius=e.target.checked);
+
+function step(){
+  if(running){
+    updatePolice(left);updateCenter(right);disease(left);disease(right);
+    maybeSpawn(left);maybeSpawn(right);
+  }
+  drawCity(document.getElementById("left"),left);
+  drawCity(document.getElementById("right"),right);
+  stats(left,"l");stats(right,"r");
+  requestAnimationFrame(step);
+}
+resetSimulation();step();
+</script>
+</body>
+</html>
